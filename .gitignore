@@ -1,0 +1,49 @@
+# 设备数据 —— 绝对不能提交
+# 这些含 IMEI / 射频校准 / 设备唯一标识 / MTK 专有二进制
+*.bin
+*.img
+!docs/**
+nvram*
+nvdata*
+nvcfg*
+proinfo*
+persist*
+preloader*
+seccfg*
+frp*
+para*
+expdb*
+super*
+boot_a*
+boot_b*
+vbmeta_a*
+vbmeta_b*
+lk_a*
+lk_b*
+tee_a*
+tee_b*
+gz_a*
+gz_b*
+dtbo_a*
+dtbo_b*
+md1img*
+modem*
+
+# 日志与中间产物
+*.log
+usb_monitor*.log
+expdb_strings.txt
+__pycache__/
+*.pyc
+
+# 固件包
+*.apk
+*.zip
+*.tar.gz
+*.7z
+
+# 编辑器 / 系统
+.DS_Store
+.vscode/
+.idea/
+*.swp
