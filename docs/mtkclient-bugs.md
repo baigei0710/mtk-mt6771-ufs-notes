@@ -1,9 +1,19 @@
 # mtkclient 缺陷记录
 
 在给 MT6771 + UFS 平板做底层操作的过程中，发现 [mtkclient](https://github.com/bkerler/mtkclient)
-的 4 个问题。其中一个已提交 PR。
+的若干问题。
 
 版本：`v2.1.4.1-48-gcd25cf9`
+
+## 已提交上游
+
+| 链接 | 内容 | 状态 |
+|---|---|---|
+| [PR #388](https://github.com/bkerler/mtkclient/pull/388) | 修 UFS `--parttype` 变量遮蔽（非 xml 路径） | 🔵 open |
+| [Issue #391](https://github.com/bkerler/mtkclient/issues/391) | xml 路径的 `LUA`/`LU` 命名不一致 + 死代码 + size 配对错误 | 🔵 open |
+
+（Issue #391 是在 PR #388 之后写的 —— 审同一段代码时发现 xml 路径有另一套独立问题，
+且我无法实测 xml 路径，所以报告而非猜测。）
 
 ---
 
@@ -193,31 +203,100 @@ dl.shutdown(bootmode=2)     # 尝试进 fastboot
 
 ## 另外两个值得注意的点（不算 bug，但容易踩）
 
-### A. UFS 的 `partitiontype_and_size` 变量遮蔽同源问题
-`storage.py:290-340` 的 UFS 分支在 xml 路径下还有一处**死代码**：
+> 这两处已在 **[issue #391](https://github.com/bkerler/mtkclient/issues/391)** 中正式跟踪，
+> 并在 [PR #388](https://github.com/bkerler/mtkclient/pull/388) 里加了交叉引用。
+> 都是 **xml 路径**的问题，我的设备不支持 XML/DA-extension 模式，无法实测。
+
+### A. xml 路径的 `LUA`/`LU` 命名不一致 ★
+
+**这是我在写 issue 时才发现的问题，比我 PR 里描述的要严重。**
+
+`storage.py` 的 XML 分支把 `user`/`boot1`/`boot2` 和 `lu0`/`lu1`/`lu2` 当成**不同的 LUN**，
+但在非 xml 路径里它们是**同一个 LUN 的别名**：
+
+| CLI 参数 | xml 值 | 非 xml（PR 修复后） | 一致？ |
+|---|---|---|---|
+| `user` | `UFS-LUA2` | LUN0 | — |
+| `lu0` | `UFS-LUA0`（死代码） | LUN0 | ❌ |
+| `boot1` | `UFS-LUA0` | LUN1 | — |
+| `lu1` | `UFS-LUA1` | LUN1 | ❌ |
+| `boot2` | `UFS-LUA1` | LUN2 | — |
+| `lu2` | `UFS-LUA2` | LUN2 | ❌ |
+| `rpmb` / `lu3` | `UFS-LUA3` | LUN3 | ✅ |
+
+**三组别名在 xml 路径下全部指向不同的 LUA。**
+
+### 判断依据：MTK 自己的内嵌样本
+
+`xml_lib.py:786-793` 内嵌了一段真机响应：
+
+```xml
+<storage>UFS</storage>
+<ufs>
+    <block_size>0x1000</block_size>
+    <lua0_size>0x400000</lua0_size>        <!--   4 MiB -->
+    <lua1_size>0x400000</lua1_size>        <!--   4 MiB -->
+    <lua2_size>0xee5800000</lua2_size>     <!--  59 GiB -->
+    <lua3_size>0</lua3_size>
+```
+
+**两个 4MiB + 一个 59GiB** —— 这正是 UFS boot 布局的形状
+（boot LUN 小，用户区巨大）。
+
+所以：**`LUA0`/`LUA1` 是 boot LUN，`LUA2` 是用户区。**
+
+**结论**：**`LUA<n>` 和 `lu<n>` 的编号不是一回事** —— 在 MTK 的 LUA 编号里两个 boot LUN 排在前面。
+
+按这个理解：
+- **命名分支是对的**（`user`→59GiB→`LUA2`，`boot1`→4MiB→`LUA0`，`boot2`→4MiB→`LUA1`）
+- **`lu*` 分支是错的**（`lu2`→`LUA2` 会让第二个 boot LUN 变成 59GiB）
+
+### B. `boot2` 的 size 配对不一致
+
+`storage.py:305-311`：
+
+```python
+elif parttype == "boot2":
+    if not xml:
+        parttype = UFSPartitionType.BOOT2
+        self.flashsize = self.ufs.lu2_size
+    else:
+        parttype = "UFS-LUA1"
+        self.flashsize = self.ufs.lu0_size    # ← 只有这一处分组不一致
+```
+
+其他 xml 分支都是 `LUA<n>` 配 `lu<n>_size`：
+
+| 行号 | xml 值 | flashsize |
+|---|---|---|
+| 296-297 | `UFS-LUA2` | `lu2_size` |
+| 303-304 | `UFS-LUA0` | `lu0_size` |
+| 310-311 | `UFS-LUA1` | **`lu0_size`** ← 唯一不匹配 |
+| 317-318 | `UFS-LUA3` | `lu3_size` |
+
+MTK 的样本里两个 boot LUN 恰好都是 4MiB，所以观察不到差异 ——
+但配对本身不自洽，像是复制粘贴遗留。
+
+### C. `lu0`→`UFS-LUA0` 是死代码
+
+`storage.py:322-324`：
 
 ```python
 if parttype == "lu0":
     if xml:
-        parttype = "UFS-LUA0"    # ← 永不可达
+        parttype = "UFS-LUA0"    # ← 永不执行
 ```
 
-原因：xml 路径下 `parttype` 早在 line 295-297 就被设成 `"UFS-LUA2"` 了，
-所以 `parttype == "lu0"` 比较失败，进不来。
+**xml 路径下**，`parttype` 在 293-318 行已经变成 `"UFS-LUA*"` 字符串了，
+所以 322 行的字符串比较失败 → 323-337 整段不可达。
+（非 xml 路径下是整数比较失败 —— 就是 PR #388 修的那个）
 
-同时这也**暴露了语义矛盾**：line 296 说 xml 下用户区叫 `UFS-LUA2`，
-而 line 323-324（死代码）说叫 `UFS-LUA0`。
+---
 
-如果对照 `xml_lib.py:788-791` 里内置的实测样本：
-```
-lua0_size = 0x400000      (4MB)      ← boot LUN
-lua1_size = 0x400000      (4MB)      ← boot LUN
-lua2_size = 0xee5800000   (59GB)     ← 主数据区
-```
-以及 `xml_lib.py:808-811` 的 `lua0_size → lu0_size` 直接映射，
-**`LUA` 与 `LU` 的命名关系需要维护者澄清**，不宜自行猜测。
+## 一处不算 bug 的代码一致性问题
 
-### B. `return []` 与调用者的返回值约定不一致
+### `return []` 与调用者的返回值约定不一致
+
 错误路径 `return []`，而正常路径返回 3 元组 `(storage, parttype, length)`。
 
 不过**实测三处调用点都有守卫**，所以不会崩：
@@ -228,4 +307,4 @@ lua2_size = 0xee5800000   (59GB)     ← 主数据区
 if not partinfo:
     return False
 ```
-所以这条**不是**实际缺陷，只是代码一致性问题。
+所以这条**不是**实际缺陷，只是代码一致性问题，没有单独提 issue。

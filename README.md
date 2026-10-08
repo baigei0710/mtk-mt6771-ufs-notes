@@ -52,7 +52,10 @@ MTK 平台的底层机制，以及一个 mtkclient 的真实 bug（已提 PR）�
 6. **定位 recovery USB 失效的根因** —— 读取 MTK 的 `expdb` 崩溃日志分区拿到内核日志，
    发现 `musb_cmode_store NORMAL --> HOST_ONLY`。
 
-7. **发现并修复 mtkclient 的 UFS parttype bug** —— 并提交了 PR。
+7. **发现并修复 mtkclient 的 UFS parttype bug** —— 提交了
+   [PR #388](https://github.com/bkerler/mtkclient/pull/388)。审同一段代码时又发现 xml 路径
+   有另一套问题（`LUA`/`LU` 命名不一致 + 死代码），因为无法实测 xml 路径，
+   报告为 [Issue #391](https://github.com/bkerler/mtkclient/issues/391) 而非猜测修复。
 
 8. **最终失败** —— recovery 的 USB 不枚举；`init.rc` 的修改反复导致 bootloop；
    没有 adb 就无法继续。
@@ -65,7 +68,7 @@ MTK 平台的底层机制，以及一个 mtkclient 的真实 bug（已提 PR）�
 |---|---|
 | [`docs/concepts.md`](docs/concepts.md) | **基础概念入门** —— MTK / 启动链 / BL 锁 / fastboot / BCB / IMEI / 分区逐一说明（零基础可看） |
 | [`docs/problems.md`](docs/problems.md) | **29 个问题**按性质分类（环境 / mtkclient bug / 设备机制 / 我的误判 / 我造成的损失） |
-| [`docs/mtkclient-bugs.md`](docs/mtkclient-bugs.md) | mtkclient 的 4 个缺陷（1 个已提 PR，#388） |
+| [`docs/mtkclient-bugs.md`](docs/mtkclient-bugs.md) | mtkclient 的缺陷（[PR #388](https://github.com/bkerler/mtkclient/pull/388) + [Issue #391](https://github.com/bkerler/mtkclient/issues/391)） |
 | [`docs/ufs-boot-layout.md`](docs/ufs-boot-layout.md) | UFS 启动布局：preloader 为什么在 LU1 |
 | [`docs/recovery-boot.md`](docs/recovery-boot.md) | MTK 进 recovery 的三种机制 + BCB 写入方法 |
 | [`docs/device-info.md`](docs/device-info.md) | 设备档案（已脱敏） |
