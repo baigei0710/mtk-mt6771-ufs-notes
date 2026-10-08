@@ -63,6 +63,7 @@ MTK 平台的底层机制，以及一个 mtkclient 的真实 bug（已提 PR）�
 
 | 文件 | 内容 |
 |---|---|
+| [`docs/concepts.md`](docs/concepts.md) | **基础概念入门** —— MTK / 启动链 / BL 锁 / fastboot / BCB / IMEI / 分区逐一说明（零基础可看） |
 | [`docs/problems.md`](docs/problems.md) | **29 个问题**按性质分类（环境 / mtkclient bug / 设备机制 / 我的误判 / 我造成的损失） |
 | [`docs/mtkclient-bugs.md`](docs/mtkclient-bugs.md) | mtkclient 的 4 个缺陷（1 个已提 PR，#388） |
 | [`docs/ufs-boot-layout.md`](docs/ufs-boot-layout.md) | UFS 启动布局：preloader 为什么在 LU1 |
@@ -85,11 +86,22 @@ MTK 平台的底层机制，以及一个 mtkclient 的真实 bug（已提 PR）�
 
 ## 最重要的几条教训
 
-1. **判断设备能否 root，先看"通道"而非"权限"**
+1. **判断设备能否 root，先看"通道"而非"权限"**（详见 [`docs/concepts.md`](docs/concepts.md#六执行通道-vs-写权限)）
 2. **分区分级**：`boot`/`vbmeta` 可改 · **`preloader` 绝对不能碰** · IMEI/校准数据跨机绝对不行
 3. **不要在看不到设备内部状态的情况下盲改 `init.rc`**（我因此造成 3 次 bootloop）
 4. **`expdb` 分区是 MTK 排障利器**（含 preloader + 内核 + ramoops 日志）
 5. **硬超时必须外挂**：`perl -e 'alarm N; exec @ARGV'`（Python 的 SIGALRM 对阻塞 USB 调用无效）
+
+---
+
+## 如果你是新手
+
+建议按这个顺序看：
+
+1. [`docs/concepts.md`](docs/concepts.md) —— 先搞懂启动链，这是理解一切的基础
+2. [`docs/ufs-boot-layout.md`](docs/ufs-boot-layout.md) —— UFS 和 eMMC 的差别（踩坑点）
+3. [`docs/problems.md`](docs/problems.md) —— 看看会踩到什么坑
+4. [`tools/README.md`](tools/README.md) —— 想动手的话从这里开始
 
 ---
 
